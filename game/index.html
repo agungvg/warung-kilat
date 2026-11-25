@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Warung Kilat — Masak Cepat, Sajikan Tepat Waktu</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #2a2118; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 58px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; pointer-events: none; z-index: 5;
+  }
+  .pill {
+    background: rgba(20, 14, 8, 0.82); color: #fdf6e3; border-radius: 999px;
+    padding: 8px 16px; font-weight: 700; font-size: 17px; letter-spacing: 0.2px;
+  }
+  #timer { font-size: 30px; padding: 4px 22px; font-variant-numeric: tabular-nums; }
+  #timer.rush { background: #b3261e; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.07); } }
+  #hearts { color: #ff8a80; letter-spacing: 2px; }
+
+  #board {
+    position: fixed; top: 68px; left: 12px; width: 238px; z-index: 5;
+    background: rgba(46, 74, 58, 0.94); border-radius: 12px; padding: 10px 12px 12px;
+    color: #f7f0dd; box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+  }
+  #board h2 { margin: 0 0 8px; font-size: 15px; letter-spacing: 2px; text-align: center; color: #ffe9a8; }
+  .ticket {
+    background: #fffbe8; color: #33302a; border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .ticket-name { font-weight: 800; font-size: 15px; margin-bottom: 5px; }
+  .ticket-parts { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .chip {
+    font-size: 11px; font-weight: 700; color: #222; border-radius: 999px;
+    padding: 2px 8px; background: #ddd;
+  }
+  .ticket-bar { height: 8px; background: #e0d9c2; border-radius: 999px; overflow: hidden; }
+  .ticket-fill { height: 100%; background: #6fbf4a; border-radius: 999px; }
+  .ticket-fill.low { background: #d63a2f; }
+  #board-empty { font-size: 13px; color: #cfe3d4; text-align: center; padding: 6px 0; }
+
+  #hint {
+    position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%);
+    background: rgba(20, 14, 8, 0.88); color: #ffe9a8; border-radius: 999px;
+    padding: 9px 20px; font-weight: 700; font-size: 16px; z-index: 5;
+    opacity: 0; transition: opacity 0.12s;
+  }
+  #hint.show { opacity: 1; }
+  #controls {
+    position: fixed; bottom: 14px; left: 14px; z-index: 5; color: #f7f0dd;
+    background: rgba(20, 14, 8, 0.6); border-radius: 8px; padding: 7px 12px;
+    font-size: 13px; line-height: 1.5;
+  }
+  #controls b { color: #ffe9a8; }
+
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(20, 14, 8, 0.55); z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .panel {
+    background: #fdf6e3; color: #33302a; border-radius: 16px; padding: 28px 36px;
+    text-align: center; max-width: 520px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    border-top: 8px solid #b8573f;
+  }
+  .panel h1 { margin: 0 0 4px; font-size: 44px; letter-spacing: 1px; color: #b8573f; }
+  .panel h2 { margin: 0 0 10px; font-size: 30px; color: #b8573f; }
+  .panel p { margin: 8px 0; font-size: 16px; line-height: 1.5; }
+  .panel .go { color: #b8573f; font-weight: 800; font-size: 18px; margin-top: 14px; }
+  .panel .best { font-size: 14px; color: #7a6a4a; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Warung Kilat: masak pesanan pelanggan sebelum waktunya habis"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="topbar">
+  <div class="pill"><span id="coins">Koin 0</span> &nbsp;·&nbsp; <span id="dishes">Sajian 0/8</span></div>
+  <div class="pill" id="timer">2:30</div>
+  <div class="pill" id="hearts">♥♥♥</div>
+</div>
+
+<div id="board">
+  <h2>— PESANAN —</h2>
+  <div id="orders"></div>
+  <div id="board-empty">Belum ada pesanan…</div>
+</div>
+
+<div id="hint"></div>
+<div id="controls"><b>WASD / ←↑↓→</b> jalan &nbsp;·&nbsp; <b>E / Spasi / klik</b> ambil &amp; pakai &nbsp;·&nbsp; <b>P</b> jeda &nbsp;·&nbsp; <b>R</b> ulang</div>
+
+<div class="overlay" id="overlay-title">
+  <div class="panel">
+    <h1>WARUNG KILAT</h1>
+    <p>Masak cepat, sajikan tepat waktu! Ambil bahan dari peti, potong di talenan,
+    masak di wajan atau panggangan, tata di piring, dan sajikan di jendela
+    sebelum pelanggan keburu pergi.</p>
+    <p>Sajikan <b>8 piring</b> dalam <b>2:30</b> menit. Tiga pesanan hangus dan dapur tutup.</p>
+    <p class="go">Tekan Spasi atau klik untuk mulai</p>
+    <p class="best" id="best-line">Terbaik: 0 koin</p>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay-pause">
+  <div class="panel">
+    <h2>Jeda</h2>
+    <p>Wajan menunggu. Pelanggan tidak.</p>
+    <p class="go">Tekan P untuk lanjut</p>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay-over">
+  <div class="panel">
+    <h2 id="over-title">Shift Selesai</h2>
+    <p id="over-stats"></p>
+    <p class="go">Tekan Spasi untuk main lagi</p>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
